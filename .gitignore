@@ -1,4 +1,6 @@
 *.mp4
 FlyingChairs_release/
 FlyingChairs_100/
+FlyingChairs_100_dark/
+FlyingChairs_100_CLAHE/
 *.csv
