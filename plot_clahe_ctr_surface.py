@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+import matplotlib.patches as mpatches
 
 
 def apply_clahe_color(img: np.ndarray, clip_limit: float, tile_grid: int) -> np.ndarray:
@@ -110,6 +111,22 @@ def main():
 
     grid_ctr = np.zeros((len(args.tile_sizes), len(args.clip_limits)), dtype=float)
 
+    # Baseline run without CLAHE (on the original dataset).
+    print("Running baseline (no CLAHE) on source dataset...")
+    with tempfile.TemporaryDirectory() as base_tmp_str:
+        base_tmp = Path(base_tmp_str)
+        df_base = run_letnet_chairs(
+            demo_bin=demo_bin,
+            model_param=model_param,
+            model_bin=model_bin,
+            data_dir=src_dir,
+            workdir=base_tmp,
+        )
+        baseline_ctr = df_base["correct_tracking_ratio"].mean()
+        base_metrics_out = args.out_dir / "metrics_baseline_no_clahe.csv"
+        df_base.to_csv(base_metrics_out, index=False)
+        print(f"  baseline mean CTR={baseline_ctr:.4f}, metrics saved to {base_metrics_out}")
+
     for i, tile in enumerate(args.tile_sizes):
         for j, clip in enumerate(args.clip_limits):
             print(f"Running clipLimit={clip}, tileGridSize={tile}...")
@@ -137,11 +154,20 @@ def main():
     Clip, Tile = np.meshgrid(args.clip_limits, args.tile_sizes)
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection="3d")
-    ax.plot_surface(Clip, Tile, grid_ctr, cmap="viridis", edgecolor="none", alpha=0.9)
+    surf = ax.plot_surface(Clip, Tile, grid_ctr, cmap="viridis", edgecolor="none", alpha=0.9)
+    # Baseline plane for reference.
+    baseline_plane = np.ones_like(grid_ctr) * baseline_ctr
+    base_surf = ax.plot_surface(Clip, Tile, baseline_plane, color="red", alpha=0.2, edgecolor="none")
     ax.set_xlabel("clipLimit")
     ax.set_ylabel("tileGridSize")
     ax.set_zlabel("Mean CTR")
     ax.set_title("Mean Correct Tracking Ratio vs. CLAHE parameters")
+    # Legend proxies
+    legend_patches = [
+        mpatches.Patch(color="red", alpha=0.2, label="Baseline (no CLAHE)"),
+        mpatches.Patch(color=plt.cm.viridis(0.6), label="CLAHE surface"),
+    ]
+    ax.legend(handles=legend_patches, loc="upper right")
     plt.tight_layout()
     plot_path = args.out_dir / "ctr_surface.png"
     plt.savefig(plot_path, dpi=200)
