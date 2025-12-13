@@ -31,3 +31,17 @@ Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working direc
 
 ## Notebook (optical flow comparison)
 `ece253.ipynb` contains Python helpers to evaluate optical flow (e.g., Farneback) against FlyingChairs ground truth with and without CLAHE. Run it in Jupyter from repo root with the dataset present.
+
+## Motion blur generation and blind deconvolution
+- Add motion blur to a video:  
+  `python3 motion_blur_video.py --input input.mp4 --output blurred.mp4 --length 15 --angle 20`
+  (Optional flags: `--width` to thicken the PSF line, `--fps` to override detected FPS.)
+- Blind deconvolution on an image or video (alternating Richardson-Lucy updates):  
+  `python3 blind_deconvolution.py --input blurred.mp4 --output deblurred.mp4 --kernel-size 15 --outer-iters 6 --image-iters 12 --kernel-iters 8`  
+  For images, point to a `.png/.jpg` and adjust iteration counts and kernel size as needed.
+- FlyingChairs sweeps / metrics:  
+  - Blur a dataset: `python3 motion_blur_dataset.py --src FlyingChairs_100/data --dst FlyingChairs_100_blur/data --length 15 --angle 20` (add `--max-count` to limit pairs).  
+  - Deblur: `python3 blind_deconv_dataset.py --src FlyingChairs_100_blur/data --dst FlyingChairs_100_deblur/data --kernel-size 15 --outer-iters 4 --image-iters 8 --kernel-iters 6 --max-count 50`  
+  - LET-NET eval with CTR CSV: `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin FlyingChairs_100_blur/data --chairs` (writes `letnet_chairs_metrics.csv`, prints mean CTR).  
+  - Plot CTR vs blur length (blurred vs deblurred, limited pairs for speed):  
+    `python3 sweep_blur_vs_deblur.py --src FlyingChairs_100/data --blur-lengths 5 10 15 20 --angle 20 --max-count 50 --deblur --out-plot blur_vs_deblur_ctr.png`

@@ -1,14 +1,3 @@
-"""
-Apply CLAHE to a FlyingChairs-style dataset (e.g., the darkened subset) and
-write results to a new folder, copying .flo files unchanged.
-
-Defaults assume input from Flyingchairs_100_dark/data and output to
-FlyingChairs_CLAHE/data.
-
-Usage:
-    python apply_clahe_dataset.py --src Flyingchairs_100_dark/data --dst FlyingChairs_CLAHE/data
-"""
-
 import argparse
 import shutil
 from pathlib import Path
@@ -17,8 +6,7 @@ import cv2
 import numpy as np
 
 
-def apply_clahe_color(img: np.ndarray, clip_limit: float = 2.0, tile_grid: int = 8) -> np.ndarray:
-    """Apply CLAHE on the L channel in LAB space."""
+def apply_clahe_color(img, clip_limit = 2.0, tile_grid = 8):
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_grid, tile_grid))
@@ -27,7 +15,7 @@ def apply_clahe_color(img: np.ndarray, clip_limit: float = 2.0, tile_grid: int =
     return cv2.cvtColor(lab2, cv2.COLOR_LAB2BGR)
 
 
-def process_pair(base: str, src: Path, dst: Path, clip_limit: float, tile_grid: int):
+def process_pair(base, src, dst, clip_limit, tile_grid):
     img1_path = src / f"{base}_img1.ppm"
     img2_path = src / f"{base}_img2.ppm"
     flow_path = src / f"{base}_flow.flo"

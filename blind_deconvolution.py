@@ -1,7 +1,7 @@
 import argparse
 import math
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 
 import cv2
 import numpy as np
@@ -10,20 +10,51 @@ from scipy.signal import fftconvolve
 EPS = 1e-8
 
 
-def richardson_lucy(channel: np.ndarray, psf: np.ndarray, iterations: int) -> np.ndarray:
-    """Non-blind Richardson-Lucy deconvolution on a single channel."""
+def _grad(img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    gx = np.zeros_like(img)
+    gy = np.zeros_like(img)
+    gx[:, :-1] = img[:, 1:] - img[:, :-1]
+    gy[:-1, :] = img[1:, :] - img[:-1, :]
+    return gx, gy
+
+
+def _div(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
+    div = np.zeros_like(gx)
+    div[:, :-1] += gx[:, :-1]
+    div[:, 1:] -= gx[:, :-1]
+    div[:-1, :] += gy[:-1, :]
+    div[1:, :] -= gy[:-1, :]
+    return div
+
+
+def prior_shrinkage(img: np.ndarray, alpha: float, lam: float, step: float = 0.2) -> np.ndarray:
+    """Simple proximal-like shrinkage for hyper-Laplacian gradient prior."""
+    gx, gy = _grad(img)
+    mag = np.sqrt(gx * gx + gy * gy + 1e-12)
+    weight = np.power(mag, alpha - 2.0)  # alpha<1 => negative exponent
+    gx_shrunk = gx * (1.0 - step * lam * weight)
+    gy_shrunk = gy * (1.0 - step * lam * weight)
+    # Prevent negative scaling from over-shrinkage
+    gx_shrunk = np.where(gx_shrunk * gx < 0, 0, gx_shrunk)
+    gy_shrunk = np.where(gy_shrunk * gy < 0, 0, gy_shrunk)
+    return img + _div(gx_shrunk - gx, gy_shrunk - gy)
+
+
+def richardson_lucy(channel: np.ndarray, psf: np.ndarray, iterations: int, alpha: float, lam: float) -> np.ndarray:
+    """Non-blind Richardson-Lucy deconvolution on a single channel with hyper-Laplacian prior."""
     estimate = np.clip(channel.astype(np.float32), 0.0, 1.0)
     psf_flip = psf[::-1, ::-1]
     for _ in range(iterations):
         conv = fftconvolve(estimate, psf, mode="same") + EPS
         relative_blur = channel / conv
         estimate *= fftconvolve(relative_blur, psf_flip, mode="same")
+        estimate = prior_shrinkage(np.clip(estimate, 0.0, 1.0), alpha=alpha, lam=lam)
         estimate = np.clip(estimate, 0.0, 1.0)
     return estimate
 
 
-def update_kernel(observed: np.ndarray, latent: np.ndarray, kernel: np.ndarray, iterations: int) -> np.ndarray:
-    """RL-style kernel refinement using the current latent estimate."""
+def update_kernel(observed: np.ndarray, latent: np.ndarray, kernel: np.ndarray, iterations: int, ker_lam: float) -> np.ndarray:
+    """RL-style kernel refinement using the current latent estimate with L2 prior."""
     k = kernel
     latent_flip = latent[::-1, ::-1]
     for _ in range(iterations):
@@ -37,11 +68,21 @@ def update_kernel(observed: np.ndarray, latent: np.ndarray, kernel: np.ndarray, 
         update_patch = update_full[start_r : start_r + k.shape[0], start_c : start_c + k.shape[1]]
 
         k *= update_patch
+        if ker_lam > 0:
+            k *= np.exp(-ker_lam * k * k)
         k = np.clip(k, 0.0, None)
         s = k.sum()
         if s > 0:
             k /= s
     return k
+
+
+def build_pyramid(img: np.ndarray, levels: int, scale: float) -> List[np.ndarray]:
+    pyr = [img]
+    for _ in range(1, levels):
+        down = cv2.resize(pyr[-1], (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        pyr.append(down)
+    return pyr[::-1]  # coarse to fine
 
 
 def alternating_blind_deconv(
@@ -50,36 +91,71 @@ def alternating_blind_deconv(
     outer_iters: int = 6,
     image_iters: int = 12,
     kernel_iters: int = 8,
+    luma_only: bool = True,
+    denoise_sigma: float = 0.0,
+    pyramid_levels: int = 4,
+    scale_factor: float = 0.5,
+    alpha: float = 0.8,
+    lam_img: float = 0.003,
+    ker_lam: float = 0.001,
+    image_iters_coarse: int = 20,
+    kernel_iters_coarse: int = 12,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Simple alternating blind deconvolution using RL updates."""
+    """Multiscale alternating blind deconvolution with hyper-Laplacian prior."""
+    if denoise_sigma > 0:
+        image = cv2.GaussianBlur(image, (0, 0), denoise_sigma)
+
+    if luma_only and image.ndim == 3:
+        lab = cv2.cvtColor((image * 255.0).astype(np.uint8), cv2.COLOR_BGR2LAB).astype(np.float32) / 255.0
+        l, a, b = cv2.split(lab)
+        work_img = l
+        chroma = (a, b)
+        is_color = True
+    elif image.ndim == 2:
+        work_img = image
+        is_color = False
+        chroma = None
+    else:
+        work_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        is_color = True
+        chroma = None
+
+    pyr = build_pyramid(work_img, pyramid_levels, scale_factor)
     k = np.ones((kernel_size, kernel_size), dtype=np.float32)
     k /= k.sum()
 
-    if image.ndim == 2:
-        channels = [image]
-        is_color = False
-    else:
-        channels = cv2.split(image)
-        is_color = True
+    for level_idx, img_lvl in enumerate(pyr):
+        if level_idx > 0:
+            # Upsample kernel to current level
+            new_sz = (img_lvl.shape[1], img_lvl.shape[0])
+            k = cv2.resize(k, (kernel_size, kernel_size), interpolation=cv2.INTER_CUBIC)
+            k = np.clip(k, 0, None)
+            s = k.sum()
+            if s > 0:
+                k /= s
 
-    latent_channels = [c.copy() for c in channels]
+        img_channels = [img_lvl]
+        latent_channels = [c.copy() for c in img_channels]
 
-    for _ in range(outer_iters):
-        # Update latent image channels
-        latent_channels = [richardson_lucy(c, k, image_iters) for c in latent_channels]
+        is_fine = (level_idx == pyramid_levels - 1)
+        i_iters = image_iters if is_fine else image_iters_coarse
+        k_iters = kernel_iters if is_fine else kernel_iters_coarse
 
-        # Use luminance to stabilize kernel estimation
-        if is_color:
-            latent_gray = 0.2989 * latent_channels[0] + 0.5870 * latent_channels[1] + 0.1140 * latent_channels[2]
-            observed_gray = 0.2989 * channels[0] + 0.5870 * channels[1] + 0.1140 * channels[2]
-        else:
+        for _ in range(outer_iters):
+            latent_channels = [
+                richardson_lucy(c, k, iterations=i_iters, alpha=alpha, lam=lam_img) for c in latent_channels
+            ]
             latent_gray = latent_channels[0]
-            observed_gray = channels[0]
+            observed_gray = img_channels[0]
+            k = update_kernel(observed_gray, latent_gray, k, k_iters, ker_lam)
 
-        k = update_kernel(observed_gray, latent_gray, k, kernel_iters)
-
-    latent = latent_channels[0] if not is_color else cv2.merge(latent_channels)
-    latent = np.clip(latent * 255.0, 0, 255).astype(np.uint8)
+    restored_l = np.clip(latent_channels[0], 0.0, 1.0)
+    if luma_only and is_color and chroma is not None:
+        merged = cv2.merge([restored_l, chroma[0], chroma[1]])
+        bgr = cv2.cvtColor((merged * 255.0).astype(np.uint8), cv2.COLOR_LAB2BGR)
+        latent = bgr
+    else:
+        latent = np.clip(restored_l * 255.0, 0, 255).astype(np.uint8)
     return latent, k
 
 
@@ -129,6 +205,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outer-iters", type=int, default=6, help="Number of alternating iterations.")
     parser.add_argument("--image-iters", type=int, default=12, help="RL iterations for the image update.")
     parser.add_argument("--kernel-iters", type=int, default=8, help="RL iterations for the kernel update.")
+    parser.add_argument("--no-luma-only", action="store_true", help="Disable luma-only deconvolution (default uses LAB L-channel only).")
+    parser.add_argument("--denoise-sigma", type=float, default=0.0, help="Optional pre-blur sigma to suppress noise/ringing.")
+    parser.add_argument("--pyramid-levels", type=int, default=4, help="Number of pyramid levels (coarse-to-fine).")
+    parser.add_argument("--scale-factor", type=float, default=0.5, help="Downsample factor per pyramid level.")
+    parser.add_argument("--alpha", type=float, default=0.8, help="Hyper-Laplacian exponent (<1 suppresses ringing).")
+    parser.add_argument("--lambda-img", type=float, default=0.003, help="Image prior weight for hyper-Laplacian.")
+    parser.add_argument("--kernel-lambda", type=float, default=0.001, help="Kernel L2 prior weight to prevent kernel bloating.")
+    parser.add_argument("--image-iters-coarse", type=int, default=20, help="Image iterations at coarse levels.")
+    parser.add_argument("--kernel-iters-coarse", type=int, default=12, help="Kernel iterations at coarse levels.")
     parser.add_argument("--fps", type=float, default=None, help="Optional FPS override for video output.")
     return parser.parse_args()
 
@@ -144,6 +229,15 @@ def main() -> None:
             outer_iters=args.outer_iters,
             image_iters=args.image_iters,
             kernel_iters=args.kernel_iters,
+            luma_only=not args.no_luma_only,
+            denoise_sigma=args.denoise_sigma,
+            pyramid_levels=args.pyramid_levels,
+            scale_factor=args.scale_factor,
+            alpha=args.alpha,
+            lam_img=args.lambda_img,
+            ker_lam=args.kernel_lambda,
+            image_iters_coarse=args.image_iters_coarse,
+            kernel_iters_coarse=args.kernel_iters_coarse,
         )
     else:
         process_image(
@@ -153,6 +247,15 @@ def main() -> None:
             outer_iters=args.outer_iters,
             image_iters=args.image_iters,
             kernel_iters=args.kernel_iters,
+            luma_only=not args.no_luma_only,
+            denoise_sigma=args.denoise_sigma,
+            pyramid_levels=args.pyramid_levels,
+            scale_factor=args.scale_factor,
+            alpha=args.alpha,
+            lam_img=args.lambda_img,
+            ker_lam=args.kernel_lambda,
+            image_iters_coarse=args.image_iters_coarse,
+            kernel_iters_coarse=args.kernel_iters_coarse,
         )
 
 
