@@ -1,7 +1,6 @@
 import argparse
 import math
 from pathlib import Path
-from typing import Tuple, List
 
 import cv2
 import numpy as np
@@ -10,7 +9,7 @@ from scipy.signal import fftconvolve
 EPS = 1e-8
 
 
-def _grad(img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def _grad(img):
     gx = np.zeros_like(img)
     gy = np.zeros_like(img)
     gx[:, :-1] = img[:, 1:] - img[:, :-1]
@@ -18,7 +17,7 @@ def _grad(img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return gx, gy
 
 
-def _div(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
+def _div(gx, gy):
     div = np.zeros_like(gx)
     div[:, :-1] += gx[:, :-1]
     div[:, 1:] -= gx[:, :-1]
@@ -27,8 +26,8 @@ def _div(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
     return div
 
 
-def prior_shrinkage(img: np.ndarray, alpha: float, lam: float, step: float = 0.2) -> np.ndarray:
-    """Simple proximal-like shrinkage for hyper-Laplacian gradient prior."""
+def prior_shrinkage(img, alpha, lam, step=0.2):
+
     gx, gy = _grad(img)
     mag = np.sqrt(gx * gx + gy * gy + 1e-12)
     weight = np.power(mag, alpha - 2.0)  # alpha<1 => negative exponent
@@ -40,8 +39,8 @@ def prior_shrinkage(img: np.ndarray, alpha: float, lam: float, step: float = 0.2
     return img + _div(gx_shrunk - gx, gy_shrunk - gy)
 
 
-def richardson_lucy(channel: np.ndarray, psf: np.ndarray, iterations: int, alpha: float, lam: float) -> np.ndarray:
-    """Non-blind Richardson-Lucy deconvolution on a single channel with hyper-Laplacian prior."""
+def richardson_lucy(channel, psf, iterations, alpha, lam):
+
     estimate = np.clip(channel.astype(np.float32), 0.0, 1.0)
     psf_flip = psf[::-1, ::-1]
     for _ in range(iterations):
@@ -53,8 +52,8 @@ def richardson_lucy(channel: np.ndarray, psf: np.ndarray, iterations: int, alpha
     return estimate
 
 
-def update_kernel(observed: np.ndarray, latent: np.ndarray, kernel: np.ndarray, iterations: int, ker_lam: float) -> np.ndarray:
-    """RL-style kernel refinement using the current latent estimate with L2 prior."""
+def update_kernel(observed, latent, kernel, iterations, ker_lam):
+
     k = kernel
     latent_flip = latent[::-1, ::-1]
     for _ in range(iterations):
@@ -77,7 +76,7 @@ def update_kernel(observed: np.ndarray, latent: np.ndarray, kernel: np.ndarray, 
     return k
 
 
-def build_pyramid(img: np.ndarray, levels: int, scale: float) -> List[np.ndarray]:
+def build_pyramid(img, levels, scale):
     pyr = [img]
     for _ in range(1, levels):
         down = cv2.resize(pyr[-1], (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
@@ -86,22 +85,24 @@ def build_pyramid(img: np.ndarray, levels: int, scale: float) -> List[np.ndarray
 
 
 def alternating_blind_deconv(
-    image: np.ndarray,
-    kernel_size: int = 15,
-    outer_iters: int = 6,
-    image_iters: int = 12,
-    kernel_iters: int = 8,
-    luma_only: bool = True,
-    denoise_sigma: float = 0.0,
-    pyramid_levels: int = 4,
-    scale_factor: float = 0.5,
-    alpha: float = 0.8,
-    lam_img: float = 0.003,
-    ker_lam: float = 0.001,
-    image_iters_coarse: int = 20,
-    kernel_iters_coarse: int = 12,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Multiscale alternating blind deconvolution with hyper-Laplacian prior."""
+    image,
+):
+
+    # Default hyperparameters chosen for general-purpose blind deconvolution
+    kernel_size = 15
+    outer_iters = 6
+    image_iters = 12
+    kernel_iters = 8
+    luma_only = True
+    denoise_sigma = 0.0
+    pyramid_levels = 4
+    scale_factor = 0.5
+    alpha = 0.8
+    lam_img = 0.003
+    ker_lam = 0.001
+    image_iters_coarse = 20
+    kernel_iters_coarse = 12
+
     if denoise_sigma > 0:
         image = cv2.GaussianBlur(image, (0, 0), denoise_sigma)
 
@@ -127,7 +128,6 @@ def alternating_blind_deconv(
     for level_idx, img_lvl in enumerate(pyr):
         if level_idx > 0:
             # Upsample kernel to current level
-            new_sz = (img_lvl.shape[1], img_lvl.shape[0])
             k = cv2.resize(k, (kernel_size, kernel_size), interpolation=cv2.INTER_CUBIC)
             k = np.clip(k, 0, None)
             s = k.sum()
@@ -159,22 +159,22 @@ def alternating_blind_deconv(
     return latent, k
 
 
-def process_image(path: Path, output: Path, **kwargs) -> None:
+def process_image(path, output):
     img = cv2.imread(str(path), cv2.IMREAD_COLOR)
     if img is None:
         raise RuntimeError(f"Could not read image: {path}")
     img_f = img.astype(np.float32) / 255.0
-    restored, kernel = alternating_blind_deconv(img_f, **kwargs)
+    restored, kernel = alternating_blind_deconv(img_f)
     cv2.imwrite(str(output), restored)
     print(f"Wrote deblurred image to {output} with kernel sum {kernel.sum():.6f}")
 
 
-def process_video(path: Path, output: Path, fps_override: float | None, **kwargs) -> None:
+def process_video(path, output):
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         raise RuntimeError(f"Could not open video: {path}")
 
-    fps = fps_override or cap.get(cv2.CAP_PROP_FPS)
+    fps = cap.get(cv2.CAP_PROP_FPS)
     if fps is None or fps <= 1 or math.isnan(fps):
         fps = 24.0
 
@@ -188,7 +188,7 @@ def process_video(path: Path, output: Path, fps_override: float | None, **kwargs
         ret, frame = cap.read()
         if not ret:
             break
-        restored, _ = alternating_blind_deconv(frame.astype(np.float32) / 255.0, **kwargs)
+        restored, _ = alternating_blind_deconv(frame.astype(np.float32) / 255.0)
         writer.write(restored)
         frames += 1
 
@@ -197,66 +197,19 @@ def process_video(path: Path, output: Path, fps_override: float | None, **kwargs
     print(f"Processed {frames} frames to {output} at {fps:.2f} FPS.")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser(description="Blind deconvolution (alternating RL).")
     parser.add_argument("--input", required=True, type=Path, help="Input image or video path.")
     parser.add_argument("--output", required=True, type=Path, help="Output path.")
-    parser.add_argument("--kernel-size", type=int, default=15, help="Square kernel size.")
-    parser.add_argument("--outer-iters", type=int, default=6, help="Number of alternating iterations.")
-    parser.add_argument("--image-iters", type=int, default=12, help="RL iterations for the image update.")
-    parser.add_argument("--kernel-iters", type=int, default=8, help="RL iterations for the kernel update.")
-    parser.add_argument("--no-luma-only", action="store_true", help="Disable luma-only deconvolution (default uses LAB L-channel only).")
-    parser.add_argument("--denoise-sigma", type=float, default=0.0, help="Optional pre-blur sigma to suppress noise/ringing.")
-    parser.add_argument("--pyramid-levels", type=int, default=4, help="Number of pyramid levels (coarse-to-fine).")
-    parser.add_argument("--scale-factor", type=float, default=0.5, help="Downsample factor per pyramid level.")
-    parser.add_argument("--alpha", type=float, default=0.8, help="Hyper-Laplacian exponent (<1 suppresses ringing).")
-    parser.add_argument("--lambda-img", type=float, default=0.003, help="Image prior weight for hyper-Laplacian.")
-    parser.add_argument("--kernel-lambda", type=float, default=0.001, help="Kernel L2 prior weight to prevent kernel bloating.")
-    parser.add_argument("--image-iters-coarse", type=int, default=20, help="Image iterations at coarse levels.")
-    parser.add_argument("--kernel-iters-coarse", type=int, default=12, help="Kernel iterations at coarse levels.")
-    parser.add_argument("--fps", type=float, default=None, help="Optional FPS override for video output.")
     return parser.parse_args()
 
 
-def main() -> None:
+def main():
     args = parse_args()
     if args.input.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}:
-        process_video(
-            args.input,
-            args.output,
-            fps_override=args.fps,
-            kernel_size=args.kernel_size,
-            outer_iters=args.outer_iters,
-            image_iters=args.image_iters,
-            kernel_iters=args.kernel_iters,
-            luma_only=not args.no_luma_only,
-            denoise_sigma=args.denoise_sigma,
-            pyramid_levels=args.pyramid_levels,
-            scale_factor=args.scale_factor,
-            alpha=args.alpha,
-            lam_img=args.lambda_img,
-            ker_lam=args.kernel_lambda,
-            image_iters_coarse=args.image_iters_coarse,
-            kernel_iters_coarse=args.kernel_iters_coarse,
-        )
+        process_video(args.input, args.output)
     else:
-        process_image(
-            args.input,
-            args.output,
-            kernel_size=args.kernel_size,
-            outer_iters=args.outer_iters,
-            image_iters=args.image_iters,
-            kernel_iters=args.kernel_iters,
-            luma_only=not args.no_luma_only,
-            denoise_sigma=args.denoise_sigma,
-            pyramid_levels=args.pyramid_levels,
-            scale_factor=args.scale_factor,
-            alpha=args.alpha,
-            lam_img=args.lambda_img,
-            ker_lam=args.kernel_lambda,
-            image_iters_coarse=args.image_iters_coarse,
-            kernel_iters_coarse=args.kernel_iters_coarse,
-        )
+        process_image(args.input, args.output)
 
 
 if __name__ == "__main__":

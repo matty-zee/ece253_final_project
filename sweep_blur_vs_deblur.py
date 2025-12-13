@@ -1,26 +1,3 @@
-"""
-Sweep motion-blur length values, optionally deblur (blind RL) and/or edge-deblur,
-and plot LET-NET mean CTR.
-
-Steps per blur length:
-  1) Create a blurred subset (optional --max-count to limit pairs for speed).
-  2) Optionally deblur it with blind RL and/or edge-based sharpening.
-  3) Run LET-NET chairs evaluation to get mean CTR from letnet_chairs_metrics.csv.
-
-Example:
-python3 sweep_blur_vs_deblur.py \
-  --src FlyingChairs_100/data \
-  --blur-lengths 5 10 15 20 \
-  --angle 20 \
-  --max-count 50 \
-  --deblur \
-  --edge-deblur \
-  --demo-bin LET-NET/build/demo \
-  --model-param LET-NET/model/model.param \
-  --model-bin LET-NET/model/model.bin \
-  --out-plot blur_vs_deblur_ctr.png
-"""
-
 import argparse
 import csv
 import subprocess
@@ -34,7 +11,7 @@ def run_cmd(cmd, cwd=None):
     subprocess.run(cmd, check=True, cwd=cwd)
 
 
-def read_mean_ctr(metrics_path: Path) -> float:
+def read_mean_ctr(metrics_path):
     total = 0
     acc = 0.0
     with metrics_path.open() as f:
@@ -47,7 +24,7 @@ def read_mean_ctr(metrics_path: Path) -> float:
     return acc / total
 
 
-def eval_dataset(data_dir: Path, demo_bin: Path, model_param: Path, model_bin: Path, workdir: Path) -> float:
+def eval_dataset(data_dir, demo_bin, model_param, model_bin, workdir):
     cmd = [
         str(demo_bin),
         str(model_param),
@@ -71,10 +48,6 @@ def parse_args():
     p.add_argument("--max-count", type=int, default=50, help="Number of pairs to process per sweep value (speed).")
     p.add_argument("--deblur", action="store_true", help="Also evaluate after blind deconvolution.")
     p.add_argument("--edge-deblur", action="store_true", help="Also evaluate edge-based deblur.")
-    p.add_argument("--kernel-size", type=int, default=15, help="Blind deconvolution kernel size.")
-    p.add_argument("--outer-iters", type=int, default=4, help="Blind deconvolution alternating iterations.")
-    p.add_argument("--image-iters", type=int, default=8, help="RL iterations for image update.")
-    p.add_argument("--kernel-iters", type=int, default=6, help="RL iterations for kernel update.")
     p.add_argument("--edge-amount", type=float, default=1.0, help="Edge deblur boost amount.")
     p.add_argument("--edge-bilateral-d", type=int, default=9, help="Edge deblur bilateral diameter.")
     p.add_argument("--edge-sigma-color", type=float, default=75.0, help="Edge deblur sigmaColor.")
@@ -104,7 +77,6 @@ def main():
             deblur_dir = tmpdir / "deblurred"
             edge_dir = tmpdir / "edge_deblurred"
 
-            # Blur subset
             run_cmd(
                 [
                     "python3",
@@ -123,7 +95,6 @@ def main():
                     str(args.max_count),
                 ]
             )
-            # Evaluate blurred
             blur_ctr = eval_dataset(blur_dir, demo_bin, model_param, model_bin, workdir=tmpdir)
             blur_ctrs.append(blur_ctr)
             print(f"  mean CTR blurred: {blur_ctr:.4f}")
@@ -137,14 +108,6 @@ def main():
                         str(blur_dir),
                         "--dst",
                         str(deblur_dir),
-                        "--kernel-size",
-                        str(args.kernel_size),
-                        "--outer-iters",
-                        str(args.outer_iters),
-                        "--image-iters",
-                        str(args.image_iters),
-                        "--kernel-iters",
-                        str(args.kernel_iters),
                         "--max-count",
                         str(args.max_count),
                     ]
@@ -178,7 +141,6 @@ def main():
                 edge_ctrs.append(edge_ctr)
                 print(f"  mean CTR edge-deblurred: {edge_ctr:.4f}")
 
-    # Plot
     plt.figure(figsize=(8, 5))
     plt.plot(args.blur_lengths, blur_ctrs, marker="o", label="Blurred")
     if args.deblur:

@@ -2,43 +2,11 @@ import csv
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import List, Dict
 
 import matplotlib.pyplot as plt
 
 from blind_deconv_dataset import process_dataset
-
-
-@dataclass
-class DeconvConfig:
-    name: str
-    kernel_size: int = 15
-    denoise_sigma: float = 0.0
-    alpha: float = 0.8
-    outer_iters: int = 2
-    image_iters: int = 6
-    kernel_iters: int = 4
-    pyramid_levels: int = 2
-    max_pairs: int = 10  # limit workload for sweeps to keep runtime manageable
-
-    def as_kwargs(self) -> Dict:
-        return dict(
-            kernel_size=self.kernel_size,
-            outer_iters=self.outer_iters,
-            image_iters=self.image_iters,
-            kernel_iters=self.kernel_iters,
-            luma_only=True,
-            denoise_sigma=self.denoise_sigma,
-            pyramid_levels=self.pyramid_levels,
-            scale_factor=0.5,
-            alpha=self.alpha,
-            lam_img=0.003,
-            ker_lam=0.001,
-            image_iters_coarse=12,
-            kernel_iters_coarse=8,
-        )
 
 
 SRC_DIR = Path("Library_Out/data_motion_blur")
@@ -87,33 +55,32 @@ def read_mean_ctr_from_file(path: Path) -> float:
 
 
 def main() -> None:
-    configs: List[DeconvConfig] = [
-        DeconvConfig(name="k11_fast", kernel_size=11, denoise_sigma=0.0, alpha=0.8),
-        DeconvConfig(name="k15_dn05", kernel_size=15, denoise_sigma=0.5, alpha=0.8),
-        DeconvConfig(name="k21_alpha07", kernel_size=21, denoise_sigma=0.0, alpha=0.7),
+    # With simplified blind deconvolution defaults, configs are labels only.
+    configs = [
+        {"name": "default_run_1", "max_pairs": 10},
+        {"name": "default_run_2", "max_pairs": 10},
+        {"name": "default_run_3", "max_pairs": 10},
     ]
 
     results = []
     DEST_ROOT.mkdir(parents=True, exist_ok=True)
 
     for cfg in configs:
-        dst = DEST_ROOT / cfg.name
-        print(f"Processing config {cfg.name} -> {dst}")
+        dst = DEST_ROOT / cfg["name"]
+        print(f"Processing config {cfg['name']} -> {dst}")
         metrics_file = dst / "letnet_chairs_metrics.csv"
         if not metrics_file.exists():
             process_dataset(
                 src=SRC_DIR,
                 dst=dst,
-                max_count=cfg.max_pairs,
-                **cfg.as_kwargs(),
+                max_count=cfg["max_pairs"],
             )
             mean_ctr = run_letnet_chairs(dst)
         else:
             print("Metrics already present, skipping recompute.")
             mean_ctr = read_mean_ctr_from_file(metrics_file)
-        print(f"{cfg.name}: mean CTR {mean_ctr:.4f}")
-        row = asdict(cfg)
-        row["mean_ctr"] = mean_ctr
+        print(f"{cfg['name']}: mean CTR {mean_ctr:.4f}")
+        row = {"name": cfg["name"], "max_pairs": cfg["max_pairs"], "mean_ctr": mean_ctr}
         results.append(row)
 
     # Write summary CSV
