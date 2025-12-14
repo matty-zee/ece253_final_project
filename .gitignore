@@ -1,8 +1,3 @@
 *.mp4
-FlyingChairs_release/
-FlyingChairs_100/
-FlyingChairs_100_dark/
-FlyingChairs_100_CLAHE/
-*.csv
-LET-NET
-CLAHE_100_SSR
+/Datasets/
+/Numerical_Results_CLAHE_MSR/**/*.csv

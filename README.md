@@ -20,7 +20,7 @@ From repo root (or adjust paths accordingly):
 Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working directory.
 
 ## Create smaller subsets / variants
-- First 300 files subset (already generated once): `FlyingChairs_100/data`
+- First 100 files subset (already generated once): `FlyingChairs_100/data`
 - Arbitrary subset (sequential or random):  
   `python subset_flyingchairs.py --src FlyingChairs_release/data --dst FlyingChairs_rand50 --count 50 --mode random --seed 123`
 - Darkened vignette variant:  
