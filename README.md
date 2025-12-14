@@ -46,12 +46,14 @@ Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working direc
 ## Evaluating LET-NET performance
 - FlyingChairs evaluation (full or sampled):  
   `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin FlyingChairs_release/data --chairs [sample_count] [seed]`
-- Custom video/dataset (e.g., library_outside.mp4 processed into triplets):  
+- Custom video/dataset (e.g., library_outside.mp4):  
   `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin library_outside_flow/data --chairs`
 
 ## CLAHE/ MSR evaluation
-- CLAHE surface sweep:  
+- CLAHE parameter sweep:  
   `python plot_clahe_ctr_surface.py --src FlyingChairs_100/data --clip-limits 2.0 3.0 4.0 --tile-sizes 4 6 8 --out-dir clahe_sweep_results`
 
-- MSR surface sweep:  
+- MSR parameter sweep:  
   `python evaluate_msr.py --src Dataset/FlyingChairs_100/data --sigma1-range 15 30 5 --sigma2-range 15 30 5 --out-dir Numerical_Results_CLAHE_MSR`
+
+  `--sigma1-range` and `--sigma2-range` has three args: (start, end, step) for evaluating performance for ranges of different variance.
