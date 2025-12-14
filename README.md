@@ -27,7 +27,6 @@ Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working direc
 ## Applying Artificial Darkening
 - Darkened vignette variant:  
   `python make_dark_vignette.py --src FlyingChairs_100/data --dst Flyingchairs_100_dark/data --seed 42 --falloff-scale 3.0`
-  (requires `opencv-python`)
 
 ## Motion blur generation and blind deconvolution
 - Add motion blur to a video:  
