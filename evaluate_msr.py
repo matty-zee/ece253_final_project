@@ -87,12 +87,6 @@ def main():
     parser = argparse.ArgumentParser(description="Sweep two-scale MSR and plot CTR.")
     parser.add_argument("--src", type=Path, default=Path("Dataset/FlyingChairs_100/data"),
                         help="Source dataset directory (triplets).")
-    parser.add_argument("--demo-bin", type=Path, default=Path("LET-NET/build/demo"),
-                        help="Path to built LET-NET demo binary.")
-    parser.add_argument("--model-param", type=Path, default=Path("LET-NET/model/model.param"),
-                        help="Path to LET-NET model param file.")
-    parser.add_argument("--model-bin", type=Path, default=Path("LET-NET/model/model.bin"),
-                        help="Path to LET-NET model bin file.")
     parser.add_argument("--sigma1-range", type=float, nargs=3, metavar=("START", "END", "STEP"),
                         default=[15, 40, 10],
                         help="Range for first sigma (start end step).")
@@ -104,9 +98,9 @@ def main():
     args = parser.parse_args()
 
     src_dir = args.src.resolve()
-    demo_bin = args.demo_bin.resolve()
-    model_param = args.model_param.resolve()
-    model_bin = args.model_bin.resolve()
+    demo_bin = Path("LET-NET/build/demo").resolve()
+    model_param = Path("LET-NET/model/model.param").resolve()
+    model_bin = Path("LET-NET/model/model.bin").resolve()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     def frange(start: float, end: float, step: float):

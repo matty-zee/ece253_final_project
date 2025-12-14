@@ -86,12 +86,6 @@ def main():
     parser = argparse.ArgumentParser(description="Plot CTR vs sigma for SSR-processed datasets.")
     parser.add_argument("--src", type=Path, default=Path("Flyingchairs_100_dark/data"),
                         help="Source dataset directory (triplets).")
-    parser.add_argument("--demo-bin", type=Path, default=Path("LET-NET/build/demo"),
-                        help="Path to built LET-NET demo binary.")
-    parser.add_argument("--model-param", type=Path, default=Path("LET-NET/model/model.param"),
-                        help="Path to LET-NET model param file.")
-    parser.add_argument("--model-bin", type=Path, default=Path("LET-NET/model/model.bin"),
-                        help="Path to LET-NET model bin file.")
     parser.add_argument("--sigmas", type=float, nargs="+", default=[5, 10, 15, 20],
                         help="Sigma values to sweep for SSR.")
     parser.add_argument("--out-dir", type=Path, default=Path("ssr_sweep_results"),
@@ -103,9 +97,9 @@ def main():
     args = parser.parse_args()
 
     src_dir = args.src.resolve()
-    demo_bin = args.demo_bin.resolve()
-    model_param = args.model_param.resolve()
-    model_bin = args.model_bin.resolve()
+    demo_bin = Path("LET-NET/build/demo").resolve()
+    model_param = Path("LET-NET/model/model.param").resolve()
+    model_bin = Path("LET-NET/model/model.bin").resolve()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     sigma_vals = []

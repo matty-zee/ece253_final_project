@@ -87,12 +87,6 @@ def main():
     parser = argparse.ArgumentParser(description="Sweep CLAHE params and plot CTR surface.")
     parser.add_argument("--src", type=Path, default=Path("FlyingChairs_100/data"),
                         help="Source dataset directory (triplets).")
-    parser.add_argument("--demo-bin", type=Path, default=Path("LET-NET/build/demo"),
-                        help="Path to built LET-NET demo binary.")
-    parser.add_argument("--model-param", type=Path, default=Path("LET-NET/model/model.param"),
-                        help="Path to LET-NET model param file.")
-    parser.add_argument("--model-bin", type=Path, default=Path("LET-NET/model/model.bin"),
-                        help="Path to LET-NET model bin file.")
     parser.add_argument("--clip-limits", type=float, nargs="+", default=[2.0, 3.0, 4.0],
                         help="List of CLAHE clipLimit values to sweep.")
     parser.add_argument("--tile-sizes", type=int, nargs="+", default=[4, 6, 8],
@@ -103,9 +97,9 @@ def main():
 
     # Resolve binaries and models to absolute paths so they work from temp dirs.
     src_dir = args.src.resolve()
-    demo_bin = args.demo_bin.resolve()
-    model_param = args.model_param.resolve()
-    model_bin = args.model_bin.resolve()
+    demo_bin = Path("LET-NET/build/demo").resolve()
+    model_param = Path("LET-NET/model/model.param").resolve()
+    model_bin = Path("LET-NET/model/model.bin").resolve()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 

@@ -19,18 +19,15 @@ From repo root (or adjust paths accordingly):
   `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin FlyingChairs_release/data --chairs 50 1234`
 Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working directory.
 
-## Create smaller subsets / variants
+## Creating FlyingChair Subsets
 - First 100 files subset (already generated once): `FlyingChairs_100/data`
 - Arbitrary subset (sequential or random):  
   `python subset_flyingchairs.py --src FlyingChairs_release/data --dst FlyingChairs_rand50 --count 50 --mode random --seed 123`
+
+## Applying Artificial Darkening
 - Darkened vignette variant:  
   `python make_dark_vignette.py --src FlyingChairs_100/data --dst Flyingchairs_100_dark/data --seed 42 --falloff-scale 3.0`
   (requires `opencv-python`)
-- CLAHE version (copies .flo unchanged):  
-  `python apply_clahe_dataset.py --src Flyingchairs_100_dark/data --dst FlyingChairs_CLAHE/data --clip-limit 2.0 --tile-grid 8`
-
-## Notebook (optical flow comparison)
-`ece253.ipynb` contains Python helpers to evaluate optical flow (e.g., Farneback) against FlyingChairs ground truth with and without CLAHE. Run it in Jupyter from repo root with the dataset present.
 
 ## Motion blur generation and blind deconvolution
 - Add motion blur to a video:  
@@ -45,3 +42,16 @@ Per-pair metrics are written to `letnet_chairs_metrics.csv` in the working direc
   - LET-NET eval with CTR CSV: `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin FlyingChairs_100_blur/data --chairs` (writes `letnet_chairs_metrics.csv`, prints mean CTR).  
   - Plot CTR vs blur length (blurred vs deblurred, limited pairs for speed):  
     `python3 sweep_blur_vs_deblur.py --src FlyingChairs_100/data --blur-lengths 5 10 15 20 --angle 20 --max-count 50 --deblur --out-plot blur_vs_deblur_ctr.png`
+
+## Evaluating LET-NET performance
+- FlyingChairs evaluation (full or sampled):  
+  `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin FlyingChairs_release/data --chairs [sample_count] [seed]`
+- Custom video/dataset (e.g., library_outside.mp4 processed into triplets):  
+  `./LET-NET/build/demo LET-NET/model/model.param LET-NET/model/model.bin library_outside_flow/data --chairs`
+
+## CLAHE/ MSR evaluation
+- CLAHE surface sweep:  
+  `python plot_clahe_ctr_surface.py --src FlyingChairs_100/data --clip-limits 2.0 3.0 4.0 --tile-sizes 4 6 8 --out-dir clahe_sweep_results`
+
+- MSR surface sweep:  
+  `python evaluate_msr.py --src Dataset/FlyingChairs_100/data --sigma1-range 15 30 5 --sigma2-range 15 30 5 --out-dir Numerical_Results_CLAHE_MSR`
