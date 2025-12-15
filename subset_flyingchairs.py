@@ -1,15 +1,3 @@
-"""
-Create a subset of a FlyingChairs-style dataset.
-
-Copies *_img1.ppm, *_img2.ppm, *_flow.flo triplets from a source directory
-into a new destination directory. You can pick sequential ordering (sorted)
-or random sampling (with seed for reproducibility).
-
-Examples:
-  python subset_flyingchairs.py --src FlyingChairs_release/data --dst FlyingChairs_50 --count 50 --mode sequential
-  python subset_flyingchairs.py --src FlyingChairs_release/data --dst FlyingChairs_rand50 --count 50 --mode random --seed 123
-"""
-
 import argparse
 import random
 import shutil

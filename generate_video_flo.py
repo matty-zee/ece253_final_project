@@ -1,16 +1,3 @@
-"""
-Extract consecutive frame pairs from a video, match SIFT keypoints, and write sparse
-optical flow .flo files for each pair (max 300 keypoints per pair).
-
-- Input video: library_outside.mp4 (default; override with --video)
-- Output directory: library_outside_flow (default; override with --out)
-- Frames are saved alongside flow as <index>_img1.ppm, <index>_img2.ppm, <index>_flow.flo
-
-Flow encoding: only matched inlier keypoints are populated; other pixels are zero.
-This is sparse flow stored in Middlebury .flo format for compatibility with existing
-readers, but note that invalid regions remain zero.
-"""
-
 import argparse
 from pathlib import Path
 

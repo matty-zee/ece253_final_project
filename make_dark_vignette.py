@@ -1,15 +1,3 @@
-"""
-Generate a darkened FlyingChairs subset with per-pair vignettes.
-
-For each image pair (img1/img2) in the source directory, this script applies
-the same dark vignette to both images (to mimic a fixed illumination field),
-with random center and bright-region size for each pair. Flow files are
-copied untouched. Output is written to Flyingchairs_100_dark/data by default.
-
-Usage:
-    python make_dark_vignette.py --src FlyingChairs_100/data --dst Flyingchairs_100_dark/data --seed 42
-"""
-
 import argparse
 import random
 import shutil

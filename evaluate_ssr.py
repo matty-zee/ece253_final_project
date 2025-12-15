@@ -1,18 +1,3 @@
-"""
-Apply Single-Scale Retinex (SSR) to a FlyingChairs-style dataset for multiple
-sigma values, run LET-NET `--chairs` evaluation for each, and plot mean correct
-tracking ratio (CTR) versus sigma.
-
-Usage example:
-python plot_ssr_ctr_vs_sigma.py \
-  --src Flyingchairs_100_dark/data \
-  --demo-bin LET-NET/build/demo \
-  --model-param LET-NET/model/model.param \
-  --model-bin LET-NET/model/model.bin \
-  --sigmas 5 10 15 20 \
-  --out-dir ssr_sweep_results
-"""
-
 import argparse
 import shutil
 import subprocess

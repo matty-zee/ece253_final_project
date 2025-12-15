@@ -1,16 +1,3 @@
-"""
-Apply Multi-Scale Retinex (MSR) to a FlyingChairs-style dataset and write the
-processed images to a new directory, copying .flo files unchanged.
-
-Defaults:
-- source: FlyingChairs_100/data
-- destination: FlyingChairs_100_MSR/data
-- scales: 15, 80, 250 (adjust with --scales)
-
-Usage:
-    python apply_msr_dataset.py --src FlyingChairs_100/data --dst FlyingChairs_100_MSR/data --scales 15 80 250
-"""
-
 import argparse
 import shutil
 from pathlib import Path

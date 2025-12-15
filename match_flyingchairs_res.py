@@ -1,14 +1,3 @@
-"""
-Scale a video down to fit within the FlyingChairs resolution (512x384) while
-preserving aspect ratio, padding to the exact target size if needed.
-
-Default input: library_outside.mp4
-Default output: library_outside_resized.mp4
-
-Usage:
-    python scale_video_to_flyingchairs.py --input library_outside.mp4 --output library_outside_resized.mp4
-"""
-
 import argparse
 from pathlib import Path
 

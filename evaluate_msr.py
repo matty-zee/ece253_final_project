@@ -1,17 +1,3 @@
-"""
-Sweep two-scale Multi-Scale Retinex (MSR) parameters on a FlyingChairs-style dataset
-and plot mean correct tracking ratio (CTR) for each (sigma1, sigma2) pair.
-
-Usage example:
-python plot_msr_two_scale_ctr.py \
-  --src Dataset/FlyingChairs_100/data \
-  --demo-bin LET-NET/build/demo \
-  --model-param LET-NET/model/model.param \
-  --model-bin LET-NET/model/model.bin \
-  --scale-pairs 15,80 20,120 40,200 \
-  --out-dir msr_two_scale_sweep
-"""
-
 import argparse
 import itertools
 import shutil
